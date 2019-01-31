@@ -19,63 +19,70 @@ describe("store / get / delete string in cache", () => {
     expect(value.toString("utf-8")).toBe("sample_value");
   });
 
+  test('stream string from cache', async () => {
+    let stream = await cache.stream("key");
+
+    let bufs = [];
+    stream.on("end", () => {
+      expect(Buffer.concat(bufs).toString("utf-8")).toBe("sample_value");
+    });
+    stream.on("data",(chunk) => {
+      bufs.push(chunk);
+    });
+  });
+
+  test('update file access time', async () => {
+    let resp = await cache.touch("key");
+    expect(resp).toBe(true);
+  });
+
   test('delete key from cache', async () => {
     let value = await cache.delete("key");
     expect(value).toBe(true);
   });
 });
 
-//
-// test('downloadImage() function test for AWS S3 request', async () => {
-//   let data = await origin.downloadImage("https://s3.ap-south-1.amazonaws.com/gumlet/unit_test_images/car.png", {
-//     type: 'aws',
-//     awskey: core.params.aws.id,
-//     awssecret: core.params.aws.secret
-//   });
-//   expect(md5(data.body)).toBe('7d8a023e8a24346f3a54b0e9a8155015');
-// });
+describe("set two buffers and clear entire cache", () => {
+  test('store first buffer to cache', async () => {
+    let resp = await cache.set("buf1", Buffer.from("sample_1"));
+    expect(resp.endsWith("buf1")).toBe(true);
+  });
 
-// test('lossy compression', async () => {
-//   let data = await origin.downloadImage("https://storage.googleapis.com/gumlet/unit_test_images/forest.jpg");
-//   let compressed = await transform.lossyCompressIfEnabled(data.body, {
-//     query: {
-//       compress: 'true'
-//     }
-//   }, {
-//     format: 'jpg'
-//   });
-//   expect(data.body.length).toBe(3805232);
-//   expect(compressed.length).toBe(1681417);
-//   expect(md5(compressed)).toBe('7b96e9eac0d9bf4fc796ea89d69be099');
-// });
+  test('store second buffer to cache', async () => {
+    let resp = await cache.set("buf2", Buffer.from("sample_2"));
+    expect(resp.endsWith("buf2")).toBe(true);
+  });
 
-// test('tint=red', async () => {
-//   let data = await origin.downloadImage("https://storage.googleapis.com/gumlet/unit_test_images/lemon.jpg");
-//   let transformed = await transform.do({
-//     query: {
-//       tint: 'red'
-//     },
-//     headers: {}
-//   }, data.body);
-//   let reference = await origin.downloadImage("https://storage.googleapis.com/gumlet/unit_test_images/lemon-tint-red.jpg");
-//   expect(reference.body.equals(transformed.data)).toBe(true);
-// });
-//
-// test('extract=50,50,300,300', async () => {
-//   let data = await origin.downloadImage("https://storage.googleapis.com/gumlet/unit_test_images/lemon.jpg");
-//   let transformed = await transform.do({
-//     query: {
-//       extract: '50,50,300,300'
-//     },
-//     headers: {}
-//   }, data.body);
-//   // fs.writeFile("lemon-extract-50,50,300,300.jpg", transformed.data, () => {});
-//   let reference = await origin.downloadImage("https://storage.googleapis.com/gumlet/unit_test_images/lemon-extract-50%2C50%2C300%2C300.jpg");
-//   expect(reference.body.equals(transformed.data)).toBe(true);
-// });
+  test('clear entire cache', async () => {
+    let resp = await cache.clear();
+    expect(true).toBe(true);
+  });
+
+});
 
 
+describe("non-existent cache operations", () => {
+  test('trying to get non-existent cache key', async () => {
+    let resp = await cache.get("does_not_exist");
+    expect(resp).toBe(undefined);
+  });
 
-function md5(string) {
-  return crypto.createHash('md5').update(string).digest('hex');
-}
+  test('trying to delete non-existent cache key', async () => {
+    let resp = await cache.delete("does_not_exist");
+    expect(resp).toBe(false);
+  });
+
+  test('checking for non-existent key', async () => {
+    let resp = await cache.has("does_not_exist");
+    expect(resp).toBe(false);
+  });
+
+  test('touching non-existent key', async () => {
+    try{
+      await cache.touch("does_not_exist")
+    } catch(err) {
+      expect(err.code).toBe('ENOENT');
+    }
+  });
+
+});

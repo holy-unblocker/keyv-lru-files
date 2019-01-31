@@ -176,8 +176,12 @@ filecache.prototype.touch = async function(file) {
 	var file = path.resolve(this.opts.dir, self.sanitize(file));
 
 	return new Promise((resolve, reject) => {
-		fs.utimes(file, Date.now(), function(err){
-			resolve();
+		fs.utimes(file, Date.now(), Date.now(), function(err){
+			if(err){
+				reject(err);
+			} else {
+				resolve(true);
+			}
 		});
 	});
 };
@@ -224,7 +228,7 @@ filecache.prototype.clear = async function() {
 			if(err){
 				reject(err);
 			} else {
-				resolve();
+				resolve(true);
 			}
 		});
 	});
@@ -350,18 +354,6 @@ filecache.prototype.filesize = function(s) {
 			return Math.round(num);
 		break;
 	}
-};
-
-// make human readable filesize with decimal prefixes
-filecache.prototype.rfilesize = function(n) {
-	n = parseInt(n,10);
-	if (isNaN(n)) return "Invalid size";
-	if (n < 1000) return (n).toFixed(0)+"B";
-	if (n < 1000000) return (n/1000).toFixed(2)+"KB";
-	if (n < 1000000000) return (n/1000000).toFixed(2)+"MB";
-	if (n < 1000000000000) return (n/1000000000).toFixed(2)+"GB";
-	if (n < 1000000000000000) return (n/1000000000000).toFixed(2)+"TB";
-	return (n/1000000000000000).toFixed(2)+"PB";
 };
 
 // export
