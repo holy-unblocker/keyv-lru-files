@@ -8,8 +8,8 @@ var stream = require("stream");
 // require npm modules
 var rimraf = require("rimraf");
 
-function filecache(opts, fn){
-	if (!(this instanceof filecache)) return new filecache(opts, fn);
+function filecache(opts){
+	if (!(this instanceof filecache)) return new filecache(opts);
 
 	var self = this;
 
@@ -17,7 +17,7 @@ function filecache(opts, fn){
 	self.opts = self.parseopts(opts);
 
 	// initialize
-	self.init(fn);
+	self.init();
 
 	return this;
 
@@ -30,7 +30,7 @@ filecache.prototype.parseopts = function(opts) {
 
 	// determine cache directory
 	if (!opts.hasOwnProperty("dir") || typeof opts.dir !== "string") opts.dir = "cache";
-	o.dir = path.resolve(path.dirname(process.mainModule.filename), opts.dir);
+	o.dir = path.join(__dirname, "..", opts.dir);
 
 	// determine maximal total number of files
 	opts.files = (!opts.hasOwnProperty("files")) ? false : parseInt(opts.files,10);
@@ -57,7 +57,12 @@ filecache.prototype.parseopts = function(opts) {
 filecache.prototype.init = function() {
 	var self = this;
 
-  fs.mkdirSync(self.opts.dir);
+	try {
+		fs.mkdirSync(self.opts.dir);
+	} catch (err){
+
+	}
+
 
 	// setup cleanup timer
 	if (self.opts.check && (self.opts.files || self.opts.size)) setInterval(function(){
@@ -68,10 +73,13 @@ filecache.prototype.init = function() {
 };
 
 // check if a file exists
-filecache.prototype.has = async function(file) {
+filecache.prototype.has = async function(file, resolved_path) {
 	var self = this;
+	if(!resolved_path){
+		file = path.resolve(self.opts.dir, self.sanitize(file));
+	}
 	return new Promise((resolve, reject) => {
-		fs.access(path.resolve(self.opts.dir, self.sanitize(file)), (err) => {
+		fs.access(file, (err) => {
 				if(err){
 					resolve(false);
 				} else {
@@ -146,7 +154,7 @@ filecache.prototype.delete = async function(file) {
 
 	var file = path.resolve(this.opts.dir, self.sanitize(file));
 
-	if(await self.has(file)){
+	if(await self.has(file, true)){
 		return new Promise((resolve, reject) => {
 			fs.unlink(file, function(err){
 				if (err){
@@ -180,7 +188,7 @@ filecache.prototype.get = async function(file) {
 
 	var file = path.resolve(this.opts.dir, self.sanitize(file));
 
-	if(await self.has(file)){
+	if(await self.has(file, true)){
 		return new Promise((resolve, reject) => {
 			fs.readFile(file, function(err, buffer){
 				if (err) {
@@ -200,7 +208,7 @@ filecache.prototype.stream = async function(file) {
 	var self = this;
 	var file = path.resolve(this.opts.dir, self.sanitize(file));
 
-	if(await self.has(file)){
+	if(await self.has(file, true)){
 		return fs.createReadStream(file);
 	} else {
 		return undefined;
@@ -230,8 +238,8 @@ filecache.prototype.clean = function() {
 		let remove = [];
 		let size = 0;
 
-	  let files = files.map(function (fileName) {
-			let stats = time: fs.statSync(dir + '/' + fileName)
+	  files = files.map(function (fileName) {
+			let stats = fs.statSync(dir + '/' + fileName)
 	    return {
 	      name: fileName,
 	      atime: stats.atime.getTime(),
