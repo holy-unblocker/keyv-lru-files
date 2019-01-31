@@ -21,10 +21,11 @@
     "rimraf": "^2.6.3"
   },
   "devDependencies": {
+    "coveralls": "^3.0.2",
     "jest": "23.*"
   },
   "scripts": {
-    "test": "node_modules/jest/bin/jest.js"
+    "test": "jest --coverage"
   },
   "bugs": {
     "url": "https://github.com/gumlet/keyv-lru-files/issues"
