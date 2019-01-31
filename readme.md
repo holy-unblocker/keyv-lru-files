@@ -20,8 +20,7 @@ var cache = new lrufiles({
 	dir: "cache" 			// directory to store caches files
 	files: 100,       // maximum number of files
 	size: "1 GB",     // maximum total file size
-	check: "1 Hour",  // interval of checks
-	persist: "1 Hour" // keep access statistics in a file, save in regular intervals
+	check: "1 Hour",  // interval of stale checks in minutes
 });
 
 // add a file to cache. you can submit a buffer...

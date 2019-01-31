@@ -7,10 +7,6 @@ var stream = require("stream");
 
 // require npm modules
 var rimraf = require("rimraf");
-var mkdirp = require("mkdirp");
-var queue = require("queue");
-var debug = require("debug");
-var dur = require("dur");
 
 function filecache(opts, fn){
 	if (!(this instanceof filecache)) return new filecache(opts, fn);
@@ -59,311 +55,188 @@ filecache.prototype.parseopts = function(opts) {
 
 
 	// determine cleanup interval
-	if (!opts.hasOwnProperty("check")) opts.check = false;
-	if (typeof opts.check === "string") opts.check = dur(opts.check);
-	if (typeof opts.check !== "number" || isNaN(opts.check) || opts.check === 0) opts.check = false;
-	o.check = (opts.check) ? opts.check : Math.max(opts.check, 10000); // minimum 10 seconds
-
-	// determine persist
-	if (!opts.hasOwnProperty("persist")) opts.persist = false;
-	if (typeof opts.persist === "string") opts.persist = dur(opts.persist);
-	if (typeof opts.persist !== "number" || isNaN(opts.persist) || opts.persist === 0) opts.persist = false;
-	o.persist = opts.persist;
+	if (!opts.hasOwnProperty("check")) {
+		opts.check = 10 * 60 * 1000; // default check interval is 10 min
+	} else {
+		opts.check = opts.check * 60 * 1000 // convert passed minutes to milliseconds...
+	}
 
 	return o;
 };
 
 // initialize file cache
-filecache.prototype.init = function(fn) {
+filecache.prototype.init = function() {
 	var self = this;
 
-	// ensure callback
-	if (!fn || typeof fn !== "function") var fn = function(err){ if (err) return debug("initialization error: %s", err); };
+  fs.mkdirSync(self.opts.dir);
 
-	// ensure dir is available
-	mkdirp(self.opts.dir, function(err){
-		if (err) return fn(err);
-
-		// read directory and add files to local metadata
-		self.readdir(self.opts.dir, function(err, files){
-			if (err) return fn(err);
-
-			self.numfiles = files.length;
-			files.forEach(function(f){
-				self.filemeta[f.file] = [f.atime, f.size];
-				self.usedspace += f.size;
-			});
-
-			(function(next){
-				// FIXME: check if metadata should be used
-
-				// check if saved metadata file exists
-				fs.exists(path.resolve(self.opts.dir, ".filecache.json"), function(x){
-					if (!x) return next(null);
-
-					fs.readFile(path.resolve(self.opts.dir, ".filecache.json"), function(err, content){
-						return next(err);
-
-						try {
-							var metadata = JSON.parse(content.toString());
-						} catch (err) {
-							return next(err);
-						}
-
-						metadata.forEach(function(record){
-							// set atime to time from metadata cache, if cached atime is greater than fs atime (because fs atime is unreliable)
-							if (self.filemeta.hasOwnProperty(record[0]) && self.filemeta[record[0]].atime < record[1]) self.filemeta[record[0]].atime = record[1];
-						});
-
-
-						next(null);
-
-					});
-
-				});
-			})(function(err){
-
-				// call back immediately
-				fn(err, self);
-
-				// setup cleanup timer
-				if (self.opts.check && (self.opts.files || self.opts.size)) setInterval(function(){
-
-					// execute cleanup if need be
-					if (self.opts.files && self.opts.files < self.numfiles) return self.clean();
-					if (self.opts.size && self.opts.size < self.usedspace) return self.clean();
-					debug("noting to cleanup");
-
-				}, self.opts.check).unref();
-
-				// setup metadata save timer
-				if (self.opts.persist) setInterval(function(){
-
-					// check if 1000 write operations have happened or last save is older than 5 minutes
-					if (self.wrops < 1000 && self.lastwrite+300000 < Date.now()) return;
-
-					self.save(function(err){
-						self.wrops = 0;
-						if (err) debug("could not save metadata file");
-						if (!err) debug("saved metadata file");
-
-					});
-
-				}, self.opts.persist).unref();
-
-			});
-
-		});
-
-	});
+	// setup cleanup timer
+	if (self.opts.check && (self.opts.files || self.opts.size)) setInterval(function(){
+		self.clean();
+	}, self.opts.check).unref();
 
 	return this;
 };
 
 // check if a file exists
-filecache.prototype.check = function(file, fn) {
+filecache.prototype.has = async function(file) {
 	var self = this;
-	fs.exists(path.resolve(self.opts.dir, self.sanitize(file)), fn);
-	return this;
+	return new Promise((resolve, reject) => {
+		fs.access(path.resolve(self.opts.dir, self.sanitize(file)), (err) => {
+				if(err){
+					resolve(false);
+				} else {
+					resolve(true);
+				}
+		});
+	});
 };
 
 // add a file
-filecache.prototype.add = function(file, data, fn) {
+filecache.prototype.set = async function(file, data) {
 	var self = this;
+
+	if(file.indexOf("/") >= 0){
+		throw new Error("'/' is not supported character as key.");
+	}
 
 	var file = path.resolve(this.opts.dir, self.sanitize(file));
 
-	// if no callback given, create a default callback with error logging
-	if (typeof fn !== "function") var fn = function(err){
-		debug("[add] error: %s", err);
-	};
+	return new Promise((resolve, reject) => {
+		if ((data instanceof stream) || (data instanceof stream.Readable) || (data.readable === true)) {
+			// pipe stream to file
+			data.pipe(fs.createWriteStream(file).on("finish", function(){
+				resolve(file);
+			}).on("error", function(err){
+				reject(err);
+			}));
 
-	// make sure the direcotry exists
-	mkdirp(path.dirname(file), function(err){
-		if (err) return fn(err);
+		} else if (data instanceof Buffer) {
 
-		(function(done){
-
-			if ((data instanceof stream) || (data instanceof stream.Readable) || (data.readable === true)) {
-
-				// pipe stream to file
-				data.pipe(fs.createWriteStream(file).on("finish", function(){
-					done(null, file);
-				}).on("error", function(err){
-					done(err);
-				}));
-
-			} else if (data instanceof Buffer) {
-
-				// write buffer to file
-				fs.writeFile(file, data, function(err){
-					if (err) return done(err);
-					done(null, file);
-				});
-
-			} else if (typeof data === "object") {
-
-				// serialize object and write to file
-				try {
-					fs.writeFile(file, JSON.stringify(data), function(err){
-						if (err) return done(err);
-						done(null, file);
-					});
-				} catch (err) {
-					return done(err);
-				};
-
-			} else {
-
-				// write to file
-				fs.writeFile(file, data, function(err){
-					if (err) return done(err);
-					done(null, file);
-				});
-
-			};
-
-		})(function(err, file){
-			if (err) return debug("error saving file '%s': %s", file, err) || fn(err, file);
-
-			// get stat and add to filemeta
-			fs.stat(file, function(err, stats) {
-				if (err) return debug("error getting stats for file %s: %s", file, err);
-
-				// substract file size if file is known
-				if (self.filemeta.hasOwnProperty(file)) {
-					self.usedspace -= self.filemeta[file].size;
-					self.numfiles--;
+			// write buffer to file
+			fs.writeFile(file, data, function(err){
+				if(err){
+					reject(err);
+				} else {
+					resolve(file);
 				}
-
-				// add file to result
-				self.filemeta[file] = { file: file, size: stats.size, atime: Date.now() };
-
-				// update stats
-				self.wrops++;
-				self.numfiles++;
-				self.usedspace += self.filemeta[file].size;
-				self.oldest = Math.min(self.oldest, self.filemeta[file].atime);
-
-				fn(null, file);
-
 			});
 
-		});
+		} else if (typeof data === "object") {
 
+			// serialize object and write to file
+			try {
+				fs.writeFile(file, JSON.stringify(data), function(err){
+					if(err){
+						reject(err);
+					} else {
+						resolve(file);
+					}
+				});
+			} catch (err) {
+				return reject(err);
+			};
+
+		} else {
+			// write to file
+			fs.writeFile(file, data, function(err){
+				if(err){
+					reject(err);
+				} else {
+					resolve(file);
+				}
+			});
+
+		};
 	});
-
-	return this;
 };
 
 // remove file from cache
-filecache.prototype.remove = function(file, fn) {
+filecache.prototype.delete = async function(file) {
 	var self = this;
 
 	var file = path.resolve(this.opts.dir, self.sanitize(file));
 
-	fs.exists(file, function(x){
-		if (!x) return debug("remove: file '%s' does not exist", file) || fn(null);
-
-		fs.unlink(file, function(err){
-			if (err) return debug("remove: could not unlink file '%s': %s", file, err) || fn(err);
-
-			// update filemeta
-			self.usedspace -= self.filemeta[file].size;
-			self.numfiles--;
-			self.wrops++;
-			delete self.filemeta[file];
-
-			fn(null);
-
+	if(await self.has(file)){
+		return new Promise((resolve, reject) => {
+			fs.unlink(file, function(err){
+				if (err){
+					reject(err);
+				} else {
+					resolve(true);
+				}
+			});
 		});
-
-	});
-
-	return this;
+	} else {
+		return false;
+	}
 };
 
 // update file access time
-filecache.prototype.touch = function(file, fn) {
+filecache.prototype.touch = async function(file) {
 	var self = this;
 
 	var file = path.resolve(this.opts.dir, self.sanitize(file));
 
-	if (!self.filemeta.hasOwnProperty(file)) return fn(null);
-	self.filemeta[file].atime = Date.now();
-	fn(null);
-
-	return this;
+	return new Promise((resolve, reject) => {
+		fs.utimes(file, Date.now(), function(err){
+			resolve();
+		});
+	});
 };
 
 // get a file as buffer
-filecache.prototype.get = function(file, fn) {
+filecache.prototype.get = async function(file) {
 	var self = this;
 
 	var file = path.resolve(this.opts.dir, self.sanitize(file));
 
-	fs.exists(file, function(x){
-		if (!x) return debug("get: file '%s' does not exist", file) || fn(new Error("file does not exists"));
-		fs.readFile(file, function(err, buffer){
-			if (err) return debug("get: error reading file '%s': %s", file, err) || fn(err);
-			fn(null, buffer);
+	if(await self.has(file)){
+		return new Promise((resolve, reject) => {
+			fs.readFile(file, function(err, buffer){
+				if (err) {
+					reject(err);
+				} else {
+					resolve(buffer);
+				}
+			});
 		});
-	});
-
-	return this;
+	} else {
+		return undefined;
+	}
 };
 
 // get a file as stream
-filecache.prototype.stream = function(file, fn) {
+filecache.prototype.stream = async function(file) {
 	var self = this;
 	var file = path.resolve(this.opts.dir, self.sanitize(file));
 
-	if (typeof fn === "function") {
-		fs.exists(file, function(x){
-			if (!x) return debug("stream: file '%s' does not exist") || fn(new Error("file does not exists"));
-			fn(null, fs.createReadStream(file));
-		});
-		return this;
-	} else {
+	if(await self.has(file)){
 		return fs.createReadStream(file);
+	} else {
+		return undefined;
 	}
 };
 
 // empty the file store
-filecache.prototype.purge = function(fn) {
+filecache.prototype.clear = async function() {
 	var self = this;
 
-	// optionalize callback
-	if (typeof fn !== "function") var fn = function(err){};
-
-	rimraf(self.opts.dir, function(err){
-		if (err) return debug("error purging directory '%s': %s", self.opts.dir, err) || fn(err);
-		debug("purged directory '%s'", self.opts.dir);
-
-		// metadata
-		self.filemeta = {};
-		self.wrops = 0;
-		self.lastwrite = 0;
-		self.lastclean = 0;
-		self.usedspace = 0;
-		self.numfiles = 0;
-		self.oldest = Infinity;
-
-		fn(null);
+	return new Promise((resolve, reject) => {
+		rimraf(self.opts.dir, (err) => {
+			if(err){
+				reject(err);
+			} else {
+				resolve();
+			}
+		});
 	});
 };
 
 // cleanup files
-filecache.prototype.clean = function(fn) {
+filecache.prototype.clean = function() {
 	var self = this;
 
-	// optionalize callback
-	if (typeof fn !== "function") var fn = function(err, num){
-		if (err) return debug("cleanup error: %s", err);
-		debug("cleanup: %d files thrown away", num);
-	};
-
-	//
 	var files = [];
 	var remove = [];
 	var size = 0;
@@ -435,24 +308,6 @@ filecache.prototype.clean = function(fn) {
 	return this;
 };
 
-// save file meta
-filecache.prototype.save = function(fn) {
-	var self = this;
-
-	// check if persistance file should be used
-	if (!self.opts.persist) return fn(null);
-
-
-	// save file meta
-	fs.writeFile(path.resolve(self.opts.dir, ".filecache.json"), JSON.stringify(self.filemeta), function(err){
-		self.lastwrite = Date.now();
-		if (err) return debug("save: error daving .filecache.json: %s", err) || fn(err);
-		debug("saved .filecache.json");
-		fn(null);
-	});
-
-	return this;
-};
 
 // make filename parameter safe
 filecache.prototype.sanitize = function(f) {
@@ -546,82 +401,6 @@ filecache.prototype.rfilesize = function(n) {
 	if (n < 1000000000000) return (n/1000000000).toFixed(2)+"GB";
 	if (n < 1000000000000000) return (n/1000000000000).toFixed(2)+"TB";
 	return (n/1000000000000000).toFixed(2)+"PB";
-};
-
-// read a directory recursively and call back some stats
-filecache.prototype.readdir = function(p, fn) {
-	var self = this;
-	var result = [];
-
-	fs.readdir(p, function(err, files) {
-		if (err) return debug("error reading dir '%s': %s", p, err) || fn(err, result);
-		if (files.length === 0) return fn(null, result)
-
-		var q = queue();
-
-		files.forEach(function(f) {
-			var fp = path.join(p, f);
-			q.push(function(next){
-
-				fs.stat(fp, function(err, stats) {
-					if (err) return next(err);
-
-					// add directory to queue
-					if (stats.isDirectory()) q.push(function(done){
-						self.readdir(fp, function(err, res){
-							result = result.concat(res);
-							done(err);
-						});
-					});
-
-					// add file to result
-					if (stats.isFile()) result.push({ file: fp, size: stats.size, atime: stats.atime.getTime() });
-					next(null);
-				});
-			});
-		});
-
-		// run queue
-		q.start(function(err){
-			return fn(err||null, result);
-		});
-
-	});
-};
-
-// unlink an array of files
-filecache.prototype.unlink = function(files, fn) {
-	var self = this;
-
-	// ensure files is an array of strings
-	var files = ((files instanceof Array) ? files : [files]).filter(function(file){ return (typeof file === "string" && file !== ""); });
-
-	// keep failed files
-	var failed = [];
-
-	// check if there is nothing to do
-	if (files.length === 0) return fn(null, failed);
-
-	// create queue
-	var q = queue({ concurrency: 5 });
-
-	// push delete action to queue
-	files.forEach(function(file){
-		q.push(function(next){
-			fs.unlink(file, function(err){
-				if (err) debug("error unlinking file '%s': %s", file, err) || failed.push(file);
-				next();
-			});
-		});
-	});
-
-	// run queue
-	q.start(function(){
-		debug("unlinked %d of %d files", (files.length+failed.length), files.length);
-		return fn(null, failed);
-	});
-
-	return this;
 };
 
 // export
