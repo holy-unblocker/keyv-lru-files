@@ -1,4 +1,4 @@
-# lru files
+# Keyv lru files
 
 A file cache inspired by [lru-cache](https://github.com/isaacs/node-lru-cache).
 Least recently used files are deleted. It's helpful if your filesystem uses `atime`.
@@ -7,14 +7,14 @@ Everything is written to files and nothing is kept in-memory.
 ## Install
 
 ````
-npm install lru-files
+npm install keyv-lru-files
 ````
 
 ## Usgae
 
 ```` javascript
 
-var lrufiles = require("lru-files");
+var lrufiles = require("keyv-lru-files");
 
 var cache = new lrufiles({
 	files: 100,       // maximum number of files
@@ -64,7 +64,3 @@ cache.clean(function(err){});
 cache.purge(function(err){});
 
 ````
-
-## License
-
-[Public Domain](http://unlicense.org/UNLICENSE).

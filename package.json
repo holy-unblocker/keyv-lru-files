@@ -1,15 +1,16 @@
 {
-  "name": "lru-files",
-  "version": "0.0.7",
-  "description": "A filesystem cache of least recently used files",
-  "license": "Unlicense",
-  "author": "yetzt <node@yetzt.me>",
-  "main": "./filecache.js",
+  "name": "keyv-lru-files",
+  "version": "1.0.0",
+  "description": "Nodejs key-value LRU cache which uses filesystem as storage ",
+  "license": "MIT",
+  "author": "Aditya Patadia",
+  "main": "src/index.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yetzt/node-lru-files.git"
+    "url": "git+https://github.com/gumlet/keyv-lru-files.git"
   },
   "keywords": [
+    "keyv",
     "lru",
     "cache",
     "file",
@@ -24,7 +25,7 @@
     "rimraf": "^2.5.2"
   },
   "bugs": {
-    "url": "https://github.com/yetzt/node-lru-files/issues"
+    "url": "https://github.com/gumlet/keyv-lru-files/issues"
   },
-  "homepage": "https://github.com/yetzt/node-lru-files#readme"
+  "homepage": "https://github.com/gumlet/keyv-lru-files"
 }
