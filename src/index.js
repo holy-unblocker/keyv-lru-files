@@ -4,6 +4,7 @@
 var fs = require("fs");
 var path = require("path");
 var stream = require("stream");
+var utils = require("./utils");
 
 // require npm modules
 var rimraf = require("rimraf");
@@ -38,7 +39,7 @@ filecache.prototype.parseopts = function(opts) {
 
 	// determine maximal total file size
 	if (!opts.hasOwnProperty("size")) opts.size = false;
-	if (typeof opts.size === "string") opts.size = self.filesize(opts.size);
+	if (typeof opts.size === "string") opts.size = utils.filesize(opts.size);
 	if (typeof opts.size !== "number" || isNaN(opts.size) || opts.size === 0) opts.size = false;
 	o.size = opts.size;
 
@@ -66,17 +67,30 @@ filecache.prototype.init = function() {
 
 	// setup cleanup timer
 	if (self.opts.check && (self.opts.files || self.opts.size)) setInterval(function(){
-		self.clean();
+		self.cache_cleaner();
 	}, self.opts.check).unref();
 
 	return this;
+};
+
+filecache.prototype.keys = async function(){
+	var self = this;
+	return new Promise((resolve, reject) => {
+		fs.readdir(self.opts.dir, async function(err, files){
+			if(err){
+				resolve([]);
+			} else {
+				resolve(files);
+			}
+		});
+	});
 };
 
 // check if a file exists
 filecache.prototype.has = async function(file, resolved_path) {
 	var self = this;
 	if(!resolved_path){
-		file = path.resolve(self.opts.dir, self.sanitize(file));
+		file = path.resolve(self.opts.dir, utils.sanitize(file));
 	}
 	return new Promise((resolve, reject) => {
 		fs.access(file, (err) => {
@@ -97,7 +111,7 @@ filecache.prototype.set = async function(file, data) {
 		throw new Error("'/' is not supported character as key.");
 	}
 
-	var file = path.resolve(this.opts.dir, self.sanitize(file));
+	var file = path.resolve(this.opts.dir, utils.sanitize(file));
 
 	return new Promise((resolve, reject) => {
 		if ((data instanceof stream) || (data instanceof stream.Readable) || (data.readable === true)) {
@@ -152,7 +166,7 @@ filecache.prototype.set = async function(file, data) {
 filecache.prototype.delete = async function(file) {
 	var self = this;
 
-	var file = path.resolve(this.opts.dir, self.sanitize(file));
+	var file = path.resolve(this.opts.dir, utils.sanitize(file));
 
 	if(await self.has(file, true)){
 		return new Promise((resolve, reject) => {
@@ -170,13 +184,17 @@ filecache.prototype.delete = async function(file) {
 };
 
 // update file access time
-filecache.prototype.touch = async function(file) {
+filecache.prototype.touch = async function(file, time) {
 	var self = this;
 
-	var file = path.resolve(this.opts.dir, self.sanitize(file));
+	if(!time){
+		time = Date.now();
+	}
+
+	var file = path.resolve(this.opts.dir, utils.sanitize(file));
 
 	return new Promise((resolve, reject) => {
-		fs.utimes(file, Date.now(), Date.now(), function(err){
+		fs.utimes(file, time, time, function(err){
 			if(err){
 				reject(err);
 			} else {
@@ -190,7 +208,7 @@ filecache.prototype.touch = async function(file) {
 filecache.prototype.get = async function(file) {
 	var self = this;
 
-	var file = path.resolve(this.opts.dir, self.sanitize(file));
+	var file = path.resolve(this.opts.dir, utils.sanitize(file));
 
 	if(await self.has(file, true)){
 		return new Promise((resolve, reject) => {
@@ -210,7 +228,7 @@ filecache.prototype.get = async function(file) {
 // get a file as stream
 filecache.prototype.stream = async function(file) {
 	var self = this;
-	var file = path.resolve(this.opts.dir, self.sanitize(file));
+	var file = path.resolve(this.opts.dir, utils.sanitize(file));
 
 	if(await self.has(file, true)){
 		return fs.createReadStream(file);
@@ -235,126 +253,51 @@ filecache.prototype.clear = async function() {
 };
 
 // cleanup files
-filecache.prototype.clean = function() {
+filecache.prototype.cache_cleaner = async function() {
 	var self = this;
 
-	fs.readdir(dir, async function(err, files){
-		let remove = [];
-		let size = 0;
+	return new Promise((resolve, reject) => {
+		fs.readdir(self.opts.dir, async function(err, files){
+			let remove = [];
+			let size = 0;
 
-	  files = files.map(function (fileName) {
-			let stats = fs.statSync(dir + '/' + fileName)
-	    return {
-	      name: fileName,
-	      atime: stats.atime.getTime(),
-				size: stats.size
-	    };
-	  }).sort(function (a, b) {
-	    return a.atime - b.atime;
+		  files = files.map(function (fileName) {
+				let stats = fs.statSync(self.opts.dir + '/' + fileName)
+		    return {
+		      name: fileName,
+		      atime: stats.atime.getTime(),
+					size: stats.size
+		    };
+		  }).sort(function (a, b) {
+		    return a.atime - b.atime;
+			});
+
+
+
+			// check for filecount violation
+			if (self.opts.files) while (files.length > self.opts.files) {
+				remove.push(files.shift());
+			};
+
+			// check for filesize violations
+			if (self.opts.size) while (self.opts.size > size && files.length) {
+				size += files.pop().size;
+			};
+
+			remove = remove.concat(files);
+
+
+			// check if there are removable files
+			if (remove.length === 0) return;
+
+			for(const file of remove){
+				await self.delete(file.name);
+			}
+			resolve(true);
 		});
-
-		// check for filecount violation
-		if (self.opts.files) while (files.length > self.opts.files) {
-			remove.push(files.shift());
-		};
-
-		// check for filesize violations
-		if (self.opts.size) while (self.opts.size < size && files.length) {
-			size += files.shift().size;
-		};
-		remove.concat(files);
-
-		// check if there are removable files
-		if (remove.length === 0) return;
-
-		for(const file of remove){
-			await self.delete(file);
-		}
 	});
 };
 
-
-// make filename parameter safe
-filecache.prototype.sanitize = function(f) {
-	return path.normalize(f).replace(/^\//,'');
-};
-
-// convert human-readable filesize to an integer of bytes
-filecache.prototype.filesize = function(s) {
-	if (typeof s === "number") return s;
-	if (typeof s !== "string") return 0;
-	var match = s.toLowerCase().match(/^([0-9]+([\.,]([0-9]+))?)(\s*)([a-z]+)?$/);
-	if (!match) return 0;
-	var num = parseFloat(match[1].replace(/,/,'.'));
-	switch (match[5]) {
-		case "k":
-		case "kb":
-		case "kbyte":
-			return Math.round(num * Math.pow(10, 3));
-		break;
-		case "m":
-		case "mb":
-		case "mbyte":
-			return Math.round(num * Math.pow(10, 6));
-		break;
-		case "g":
-		case "gb":
-		case "gbyte":
-			return Math.round(num * Math.pow(10, 9));
-		break;
-		case "t":
-		case "tb":
-		case "tbyte":
-			return Math.round(num * Math.pow(10, 12));
-		break;
-		case "p":
-		case "pb":
-		case "pbyte":
-			// be aware that javascript can't represent much more than 9 of those because integers are only 2^53
-			return Math.round(num * Math.pow(10, 15));
-		break;
-		case "ki":
-		case "kib":
-		case "kibi":
-		case "kibyte":
-		case "kibibyte":
-			return Math.round(num * Math.pow(2, 10));
-		break;
-		case "mi":
-		case "mib":
-		case "mebi":
-		case "mibyte":
-		case "mebibyte":
-			return Math.round(num * Math.pow(2, 20));
-		break;
-		case "gi":
-		case "gib":
-		case "gibi":
-		case "gibyte":
-		case "gibibyte":
-			return Math.round(num * Math.pow(2, 30));
-		break;
-		case "ti":
-		case "tib":
-		case "tebi":
-		case "tibyte":
-		case "tebibyte":
-			return Math.round(num * Math.pow(2, 40));
-		break;
-		case "pi":
-		case "pib":
-		case "pebi":
-		case "pibyte":
-		case "pebibyte":
-			// be aware that javascript can't represent more than 8 of those because integers are only 2^53
-			return Math.round(num * Math.pow(2, 50));
-		break;
-		default:
-			// everything else is treated as bytes
-			return Math.round(num);
-		break;
-	}
-};
 
 // export
 module.exports = filecache;

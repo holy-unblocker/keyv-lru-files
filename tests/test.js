@@ -3,7 +3,7 @@ const lrufiles = require("../src/index");
 
 const cache = new lrufiles({
   dir: "cache", 			// directory to store caches files
-	files: 10,       // maximum number of files
+	files: 3,       // maximum number of files
 	size: "1 GB",     // maximum total file size
 	check: 10,  // interval of stale checks in minutes
 });
@@ -58,12 +58,27 @@ describe("set two buffers and clear entire cache", () => {
     expect(true).toBe(true);
   });
 
+  test('clear entire cache when it does not exist', async () => {
+    let resp = await cache.clear();
+    expect(true).toBe(true);
+  });
+
+  test('check if list of keys is zero', async () => {
+    let resp = await cache.keys();
+    expect(resp.length).toBe(0);
+  });
+
 });
 
 
 describe("non-existent cache operations", () => {
   test('trying to get non-existent cache key', async () => {
     let resp = await cache.get("does_not_exist");
+    expect(resp).toBe(undefined);
+  });
+
+  test('trying to stream non-existent cache key', async () => {
+    let resp = await cache.stream("does_not_exist");
     expect(resp).toBe(undefined);
   });
 
@@ -83,6 +98,33 @@ describe("non-existent cache operations", () => {
     } catch(err) {
       expect(err.code).toBe('ENOENT');
     }
+  });
+});
+
+
+describe("write many files and check stale cache cleaner", () => {
+  const bigcache = new lrufiles({
+    dir: "bigcache", 			// directory to store caches files
+  	files: 3,       // maximum number of files
+  	size: 12,     // maximum total file size
+  	check: 10,  // interval of stale checks in minutes
+  });
+
+  test('write 5 files', async () => {
+    await bigcache.set("file1", "value1");
+    await bigcache.set("file2", "value2");
+    await bigcache.set("file3", "value3");
+    await bigcache.set("file4", "value4");
+    let resp = await bigcache.set("file5", "value5");
+    expect(resp.endsWith("file5")).toBe(true);
+  });
+
+  test('after cache cleaner run, filecount should be 2', async () => {
+    // out of 5 keys, it first removes 2 least recently used.
+    // then it removes least recently used file exceeding the storage size.
+    await bigcache.cache_cleaner();
+    let keys = await bigcache.keys();
+    expect(keys.length).toBe(2);
   });
 
 });
