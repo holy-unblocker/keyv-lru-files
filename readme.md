@@ -22,46 +22,49 @@ var cache = new lrufiles({
 	dir: "cache" 			// directory to store caches files
 	files: 100,       // maximum number of files
 	size: "1 GB",     // maximum total file size
-	check: "1 Hour",  // interval of stale checks in minutes
+	check: 10,  // interval of stale checks in minutes
 });
 
 // add a file to cache. you can submit a buffer...
-cache.add("filename.ext", new Buffer("data"), function(err){});
+await cache.set("filename.ext", new Buffer("data"));
 
 // ... readable stream ...
-cache.add("otherfile.ext", fs.createReadableStream("/some/filename.ext"), function(err){});
+await cache.set("otherfile.ext", fs.createReadableStream("/some/filename.ext"));
 
 // ... or object
-cache.add("objectfile.json", {hello: "world"}, function(err){});
+await cache.set("objectfile.json", {hello: "world"});
 
 // get a file from cache
-cache.get("somefile.ext", function(err, buffer){
-	// calls back with a buffer
-});
+// the value is a Buffer
+let value = cache.get("somefile.ext");
 
 // get a readable stream to a cached file, straight...
-cache.stream("anyfile.ext").pipe(somewhere);
-
-// ... or via callbacl
-cache.stream("anyfile.ext" function(err, stream){
-	stream.pipe(somewhere);
-});
+let stream = await cache.stream("anyfile.ext");
 
 // check if a file is cached
-cache.check("filename.ext", function(exists){
-	// whatever
-});
+let exists = await cache.has("filename.ext");
 
 // update a files access time
-cache.touch("file/changed.txt", function(err){ });
+await cache.touch("file/changed.txt");
+
+// get list of all files cached
+let keys = await cache.keys();
 
 // remove a file from cache
-cache.remove("file/changed.txt", function(err){ });
+let deleted = await cache.delete("file/changed.txt");
 
 // manually remove old files
-cache.clean(function(err){});
+await cache.cache_cleaner();
 
 // empty everything
-cache.purge(function(err){});
+await cache.clear();
+
+// All functions return a promise so following syntax can be used for all functions
+// this is alternate way when you don't want to use async / await.
+cache.has("filename.ext").then(function(exists){
+	// do something...
+}).catch(function(err){
+	// there was error checking file existence
+});
 
 ````
