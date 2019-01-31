@@ -16,7 +16,7 @@ function filecache(opts, fn){
 	if (!(this instanceof filecache)) return new filecache(opts, fn);
 
 	var self = this;
-	
+
 	// get options
 	self.opts = self.parseopts(opts);
 
@@ -35,14 +35,14 @@ function filecache(opts, fn){
 	self.init(fn);
 
 	return this;
-	
+
 };
 
 // check and apply options
 filecache.prototype.parseopts = function(opts) {
 	var self = this;
 	var o = {};
-	
+
 	// determine cache directory
 	if (!opts.hasOwnProperty("dir") || typeof opts.dir !== "string") opts.dir = "cache";
 	o.dir = path.resolve(path.dirname(process.mainModule.filename), opts.dir);
@@ -57,11 +57,6 @@ filecache.prototype.parseopts = function(opts) {
 	if (typeof opts.size !== "number" || isNaN(opts.size) || opts.size === 0) opts.size = false;
 	o.size = opts.size;
 
-	// determine maximal file age
-	if (!opts.hasOwnProperty("age")) opts.age = false;
-	if (typeof opts.age === "string") opts.age = dur(opts.age);
-	if (typeof opts.age !== "number" || isNaN(opts.age) || opts.age === 0) opts.age = false;
-	o.age = opts.age;
 
 	// determine cleanup interval
 	if (!opts.hasOwnProperty("check")) opts.check = false;
@@ -74,26 +69,22 @@ filecache.prototype.parseopts = function(opts) {
 	if (typeof opts.persist === "string") opts.persist = dur(opts.persist);
 	if (typeof opts.persist !== "number" || isNaN(opts.persist) || opts.persist === 0) opts.persist = false;
 	o.persist = opts.persist;
-	
-	// cluster
-	o.cluster = (opts.hasOwnProperty("cluster") && opts.cluster === true) ? true : false;
-	if (o.cluster && opts.hasOwnProperty("onsave") && typeof opts.onsave === "function") o.onsave = opts.onsave;
-	
+
 	return o;
 };
 
 // initialize file cache
 filecache.prototype.init = function(fn) {
 	var self = this;
-	
+
 	// ensure callback
 	if (!fn || typeof fn !== "function") var fn = function(err){ if (err) return debug("initialization error: %s", err); };
-	
+
 	// ensure dir is available
 	mkdirp(self.opts.dir, function(err){
 		if (err) return fn(err);
 
-		// read directory and add files to local metadata 
+		// read directory and add files to local metadata
 		self.readdir(self.opts.dir, function(err, files){
 			if (err) return fn(err);
 
@@ -102,55 +93,49 @@ filecache.prototype.init = function(fn) {
 				self.filemeta[f.file] = [f.atime, f.size];
 				self.usedspace += f.size;
 			});
-			
+
 			(function(next){
 				// FIXME: check if metadata should be used
-				
+
 				// check if saved metadata file exists
 				fs.exists(path.resolve(self.opts.dir, ".filecache.json"), function(x){
 					if (!x) return next(null);
 
 					fs.readFile(path.resolve(self.opts.dir, ".filecache.json"), function(err, content){
 						return next(err);
-						
+
 						try {
 							var metadata = JSON.parse(content.toString());
 						} catch (err) {
 							return next(err);
 						}
-						
+
 						metadata.forEach(function(record){
 							// set atime to time from metadata cache, if cached atime is greater than fs atime (because fs atime is unreliable)
 							if (self.filemeta.hasOwnProperty(record[0]) && self.filemeta[record[0]].atime < record[1]) self.filemeta[record[0]].atime = record[1];
 						});
-						
-						// determine oldest file if need be
-						if (self.opts.age) {
-							self.oldest = Infinity;
-							Object.keys(self.filemeta).forEach(function(k){ self.oldest = Math.min(self.oldest, self.filemeta[k].atime); });
-						}
-						
+
+
 						next(null);
-						
+
 					});
 
 				});
 			})(function(err){
-				
+
 				// call back immediately
 				fn(err, self);
-				
+
 				// setup cleanup timer
-				if (self.opts.check && (self.opts.files || self.opts.size || self.opts.age)) setInterval(function(){
+				if (self.opts.check && (self.opts.files || self.opts.size)) setInterval(function(){
 
 					// execute cleanup if need be
 					if (self.opts.files && self.opts.files < self.numfiles) return self.clean();
 					if (self.opts.size && self.opts.size < self.usedspace) return self.clean();
-					if (self.opts.age && (Date.now()-(self.opts.age+3600000)) > self.oldest) return self.clean();
 					debug("noting to cleanup");
-					
+
 				}, self.opts.check).unref();
-				
+
 				// setup metadata save timer
 				if (self.opts.persist) setInterval(function(){
 
@@ -161,17 +146,17 @@ filecache.prototype.init = function(fn) {
 						self.wrops = 0;
 						if (err) debug("could not save metadata file");
 						if (!err) debug("saved metadata file");
-						
+
 					});
 
 				}, self.opts.persist).unref();
 
 			});
-		
+
 		});
 
 	});
-	
+
 	return this;
 };
 
@@ -185,20 +170,20 @@ filecache.prototype.check = function(file, fn) {
 // add a file
 filecache.prototype.add = function(file, data, fn) {
 	var self = this;
-		
+
 	var file = path.resolve(this.opts.dir, self.sanitize(file));
-	
+
 	// if no callback given, create a default callback with error logging
 	if (typeof fn !== "function") var fn = function(err){
 		debug("[add] error: %s", err);
 	};
-	
+
 	// make sure the direcotry exists
 	mkdirp(path.dirname(file), function(err){
 		if (err) return fn(err);
 
 		(function(done){
-			
+
 			if ((data instanceof stream) || (data instanceof stream.Readable) || (data.readable === true)) {
 
 				// pipe stream to file
@@ -253,7 +238,7 @@ filecache.prototype.add = function(file, data, fn) {
 
 				// add file to result
 				self.filemeta[file] = { file: file, size: stats.size, atime: Date.now() };
-							
+
 				// update stats
 				self.wrops++;
 				self.numfiles++;
@@ -263,60 +248,60 @@ filecache.prototype.add = function(file, data, fn) {
 				fn(null, file);
 
 			});
-			
+
 		});
 
 	});
-	
+
 	return this;
 };
 
 // remove file from cache
 filecache.prototype.remove = function(file, fn) {
 	var self = this;
-	
+
 	var file = path.resolve(this.opts.dir, self.sanitize(file));
-	
+
 	fs.exists(file, function(x){
 		if (!x) return debug("remove: file '%s' does not exist", file) || fn(null);
 
 		fs.unlink(file, function(err){
 			if (err) return debug("remove: could not unlink file '%s': %s", file, err) || fn(err);
-			
+
 			// update filemeta
 			self.usedspace -= self.filemeta[file].size;
 			self.numfiles--;
 			self.wrops++;
 			delete self.filemeta[file];
-			
+
 			fn(null);
-			
+
 		});
 
 	});
-	
+
 	return this;
 };
 
 // update file access time
 filecache.prototype.touch = function(file, fn) {
 	var self = this;
-	
+
 	var file = path.resolve(this.opts.dir, self.sanitize(file));
-	
+
 	if (!self.filemeta.hasOwnProperty(file)) return fn(null);
 	self.filemeta[file].atime = Date.now();
 	fn(null);
-	
+
 	return this;
 };
 
 // get a file as buffer
 filecache.prototype.get = function(file, fn) {
 	var self = this;
-	
+
 	var file = path.resolve(this.opts.dir, self.sanitize(file));
-	
+
 	fs.exists(file, function(x){
 		if (!x) return debug("get: file '%s' does not exist", file) || fn(new Error("file does not exists"));
 		fs.readFile(file, function(err, buffer){
@@ -324,7 +309,7 @@ filecache.prototype.get = function(file, fn) {
 			fn(null, buffer);
 		});
 	});
-	
+
 	return this;
 };
 
@@ -347,14 +332,14 @@ filecache.prototype.stream = function(file, fn) {
 // empty the file store
 filecache.prototype.purge = function(fn) {
 	var self = this;
-	
+
 	// optionalize callback
 	if (typeof fn !== "function") var fn = function(err){};
-	
+
 	rimraf(self.opts.dir, function(err){
 		if (err) return debug("error purging directory '%s': %s", self.opts.dir, err) || fn(err);
 		debug("purged directory '%s'", self.opts.dir);
-		
+
 		// metadata
 		self.filemeta = {};
 		self.wrops = 0;
@@ -363,7 +348,7 @@ filecache.prototype.purge = function(fn) {
 		self.usedspace = 0;
 		self.numfiles = 0;
 		self.oldest = Infinity;
-		
+
 		fn(null);
 	});
 };
@@ -371,56 +356,47 @@ filecache.prototype.purge = function(fn) {
 // cleanup files
 filecache.prototype.clean = function(fn) {
 	var self = this;
-	
+
 	// optionalize callback
 	if (typeof fn !== "function") var fn = function(err, num){
 		if (err) return debug("cleanup error: %s", err);
 		debug("cleanup: %d files thrown away", num);
 	};
-	
-	// 
+
+	//
 	var files = [];
 	var remove = [];
 	var size = 0;
 	var rems = 0;
-	
+
 	// collect files
-	var minatime = (Date.now()-self.opts.age);
 	Object.keys(self.filemeta).forEach(function(k){
-		
-		// check for age violation
-		if (self.opts.age && minatime > self.filemeta[k].atime) {
-			rems += self.filemeta[k].size;
-			remove.push(self.filemeta[k]);
-		} else {
 			size += self.filemeta[k].size;
 			files.push(self.filemeta[k]);
-		}
-		
 	});
-	
+
 	// sort by atime
 	files = files.sort(function(a,b){
 		return a.atime - b.atime; // FIXME: is this sort right?
 	});
-	
+
 	// check for filecount violation
 	if (self.opts.files) while (files.length > self.opts.files) {
 		size -= files[0].size;
 		rems += files[0].size;
 		remove.push(files.shift());
 	};
-	
+
 	// check for filesize violations
 	if (self.opts.size) while (self.opts.size < size) {
 		size -= files[0].size;
 		rems += files[0].size;
 		remove.push(files.shift());
 	};
-	
+
 	// check if there are removable files
 	if (remove.length === 0) return fn(null);
-	
+
 	// remove files
 	var remove_files = remove.filter(function(v){ return v.file; });
 
@@ -435,10 +411,10 @@ filecache.prototype.clean = function(fn) {
 				rems -= self.filemeta[k].size;
 			});
 		}
-		
+
 		// show stats
 		debug("cleanup: removed %d files, freed %s of space", (remove_files.length-failes.length), self.rfilesize(rems));
-		
+
 		// set filemeta and stats, find oldest
 		self.filemeta = {};
 		var oldest = Infinity;
@@ -450,29 +426,23 @@ filecache.prototype.clean = function(fn) {
 		self.usedspace = size;
 		self.numfiles = files.length;
 		self.oldest = oldest;
-		
+
 		// save filemeta
 		self.save(fn);
-				
+
 	});
-	
+
 	return this;
 };
 
 // save file meta
 filecache.prototype.save = function(fn) {
 	var self = this;
-	
+
 	// check if persistance file should be used
 	if (!self.opts.persist) return fn(null);
-	
-	// if cluster, call save callback
-	console.log("save callback?");
-	if (self.opts.cluster && (typeof self.opts.onsave === "function")) {
-		console.log("save callback!");
-		self.opts.onsave();
-	}
-	
+
+
 	// save file meta
 	fs.writeFile(path.resolve(self.opts.dir, ".filecache.json"), JSON.stringify(self.filemeta), function(err){
 		self.lastwrite = Date.now();
@@ -480,7 +450,7 @@ filecache.prototype.save = function(fn) {
 		debug("saved .filecache.json");
 		fn(null);
 	});
-	
+
 	return this;
 };
 
@@ -582,7 +552,7 @@ filecache.prototype.rfilesize = function(n) {
 filecache.prototype.readdir = function(p, fn) {
 	var self = this;
 	var result = [];
-	
+
 	fs.readdir(p, function(err, files) {
 		if (err) return debug("error reading dir '%s': %s", p, err) || fn(err, result);
 		if (files.length === 0) return fn(null, result)
@@ -610,12 +580,12 @@ filecache.prototype.readdir = function(p, fn) {
 				});
 			});
 		});
-		
+
 		// run queue
 		q.start(function(err){
 			return fn(err||null, result);
 		});
-		
+
 	});
 };
 
@@ -631,10 +601,10 @@ filecache.prototype.unlink = function(files, fn) {
 
 	// check if there is nothing to do
 	if (files.length === 0) return fn(null, failed);
-	
+
 	// create queue
 	var q = queue({ concurrency: 5 });
-		
+
 	// push delete action to queue
 	files.forEach(function(file){
 		q.push(function(next){
@@ -650,46 +620,9 @@ filecache.prototype.unlink = function(files, fn) {
 		debug("unlinked %d of %d files", (files.length+failed.length), files.length);
 		return fn(null, failed);
 	});
-	
+
 	return this;
 };
-
-// handle cluster messages
-filecache.prototype.handle = function(message){
-	var self = this;
-	if (!self.opts.cluster) return this;
-	
-	switch (message.action) {
-		case "add":
-			// add item to cache
-			if (self.filemeta.hasOwnProperty(message.file)) {
-				self.filemeta[message.file].atime = Date.now();
-			} else {
-				self.filemeta[message.file] = message.data;
-				self.usedspace += self.filemeta[message.file].size;
-				self.numfiles++;
-				self.wrops++;
-			}
-		break;
-		case "touch":
-			// update atime in cache
-			self.filemeta[message.file].atime = Date.now();
-		break;
-		case "remove":
-			// update stats and remove item from cache
-			self.usedspace -= self.filemeta[message.file].size;
-			self.numfiles--;
-			self.wrops++;
-			delete self.filemeta[message.file];
-		break;
-		case "save":
-			// reset save timer
-			self.lastwrite = Date.now();
-		break;
-	}
-	
-	return this;
-}
 
 // export
 module.exports = filecache;
