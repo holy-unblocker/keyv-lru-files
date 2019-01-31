@@ -16,17 +16,6 @@ function filecache(opts, fn){
 	// get options
 	self.opts = self.parseopts(opts);
 
-	// metadata
-	self.filemeta = {};
-
-	// write operations since last save
-	self.wrops = 0;
-	self.lastwrite = 0;
-	self.lastclean = 0;
-	self.usedspace = 0;
-	self.numfiles = 0;
-	self.oldest = Infinity;
-
 	// initialize
 	self.init(fn);
 
@@ -237,75 +226,39 @@ filecache.prototype.clear = async function() {
 filecache.prototype.clean = function() {
 	var self = this;
 
-	var files = [];
-	var remove = [];
-	var size = 0;
-	var rems = 0;
+	fs.readdir(dir, async function(err, files){
+		let remove = [];
+		let size = 0;
 
-	// collect files
-	Object.keys(self.filemeta).forEach(function(k){
-			size += self.filemeta[k].size;
-			files.push(self.filemeta[k]);
-	});
-
-	// sort by atime
-	files = files.sort(function(a,b){
-		return a.atime - b.atime; // FIXME: is this sort right?
-	});
-
-	// check for filecount violation
-	if (self.opts.files) while (files.length > self.opts.files) {
-		size -= files[0].size;
-		rems += files[0].size;
-		remove.push(files.shift());
-	};
-
-	// check for filesize violations
-	if (self.opts.size) while (self.opts.size < size) {
-		size -= files[0].size;
-		rems += files[0].size;
-		remove.push(files.shift());
-	};
-
-	// check if there are removable files
-	if (remove.length === 0) return fn(null);
-
-	// remove files
-	var remove_files = remove.filter(function(v){ return v.file; });
-
-	self.unlink(remove_files, function(err, failed){
-		if (err) return fn(err);
-		if (failed.length > 0) {
-			debug("cleanup: failed to remove %d files");
-			failed.forEach(function(f){
-				// readd to files
-				files.push(self.filemeta[k]);
-				size += self.filemeta[k].size;
-				rems -= self.filemeta[k].size;
-			});
-		}
-
-		// show stats
-		debug("cleanup: removed %d files, freed %s of space", (remove_files.length-failes.length), self.rfilesize(rems));
-
-		// set filemeta and stats, find oldest
-		self.filemeta = {};
-		var oldest = Infinity;
-		files.forEach(function(f){
-			self.filemeta[f.file] = f;
-			oldest = Math.min(oldest, f.atime);
+	  let files = files.map(function (fileName) {
+			let stats = time: fs.statSync(dir + '/' + fileName)
+	    return {
+	      name: fileName,
+	      atime: stats.atime.getTime(),
+				size: stats.size
+	    };
+	  }).sort(function (a, b) {
+	    return a.atime - b.atime;
 		});
-		self.lastclean = Date.now();
-		self.usedspace = size;
-		self.numfiles = files.length;
-		self.oldest = oldest;
 
-		// save filemeta
-		self.save(fn);
+		// check for filecount violation
+		if (self.opts.files) while (files.length > self.opts.files) {
+			remove.push(files.shift());
+		};
 
+		// check for filesize violations
+		if (self.opts.size) while (self.opts.size < size && files.length) {
+			size += files.shift().size;
+		};
+		remove.concat(files);
+
+		// check if there are removable files
+		if (remove.length === 0) return;
+
+		for(const file of remove){
+			await self.delete(file);
+		}
 	});
-
-	return this;
 };
 
 
