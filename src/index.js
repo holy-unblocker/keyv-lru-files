@@ -31,7 +31,7 @@ filecache.prototype.parseopts = function(opts) {
 
 	// determine cache directory
 	if (!opts.hasOwnProperty("dir") || typeof opts.dir !== "string") opts.dir = "cache";
-	o.dir = path.join(__dirname, "..", opts.dir);
+	o.dir = path.join(require.main.filename, "..", opts.dir);
 
 	// determine maximal total number of files
 	opts.files = (!opts.hasOwnProperty("files")) ? false : parseInt(opts.files,10);
