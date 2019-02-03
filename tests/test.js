@@ -10,6 +10,11 @@ const cache = new lrufiles({
 
 describe("store / get / delete string in cache", () => {
   test('store string to cache', async () => {
+    let resp = await cache.set("key", "sample_value_2");
+    expect(resp.endsWith("key")).toBe(true);
+  });
+
+  test('overwrite existing cache', async () => {
     let resp = await cache.set("key", "sample_value");
     expect(resp.endsWith("key")).toBe(true);
   });
@@ -115,8 +120,9 @@ describe("write many files and check stale cache cleaner", () => {
     await bigcache.set("file2", "value2");
     await bigcache.set("file3", "value3");
     await bigcache.set("file4", "value4");
-    let resp = await bigcache.set("file5", "value5");
-    expect(resp.endsWith("file5")).toBe(true);
+    await bigcache.set("file5", "value5");
+    let keys = await bigcache.keys();
+    expect(keys.length).toBe(5);
   });
 
   test('after cache cleaner run, filecount should be 2', async () => {
@@ -125,6 +131,35 @@ describe("write many files and check stale cache cleaner", () => {
     await bigcache.cache_cleaner();
     let keys = await bigcache.keys();
     expect(keys.length).toBe(2);
+  });
+
+});
+
+describe("testing cron job", () => {
+  const bigcache = new lrufiles({
+    dir: "cleaner_test", 			// directory to store caches files
+  	files: null,       // maximum number of files
+  	size: 1,     // maximum total file size
+  	check: 0.1,  // interval of stale checks in minutes
+  });
+
+  let delayPromise = new Promise((resolve) => {
+    setTimeout(resolve, 8000);
+  });
+
+  test('write 5 files', async () => {
+    await bigcache.set("file1", "value1");
+    await bigcache.set("file2", "value2");
+    await bigcache.set("file3", "value3");
+    await bigcache.set("file4", "value4");
+    let resp = await bigcache.set("file5", "value5");
+    expect(resp.endsWith("file5")).toBe(true);
+  });
+
+  test('after 8 seconds, files should be 1', async () => {
+    await delayPromise;
+    let keys = await bigcache.keys();
+    expect(keys.length).toBe(1);
   });
 
 });

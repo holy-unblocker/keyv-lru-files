@@ -46,9 +46,9 @@ filecache.prototype.parseopts = function(opts) {
 
 	// determine cleanup interval
 	if (!opts.hasOwnProperty("check")) {
-		opts.check = 10 * 60 * 1000; // default check interval is 10 min
+		o.check = 10 * 60 * 1000; // default check interval is 10 min
 	} else {
-		opts.check = opts.check * 60 * 1000 // convert passed minutes to milliseconds...
+		o.check = opts.check * 60 * 1000 // convert passed minutes to milliseconds...
 	}
 
 	return o;
@@ -66,9 +66,11 @@ filecache.prototype.init = function() {
 
 
 	// setup cleanup timer
-	if (self.opts.check && (self.opts.files || self.opts.size)) setInterval(function(){
-		self.cache_cleaner();
-	}, self.opts.check).unref();
+	if (self.opts.check && (self.opts.files || self.opts.size)) {
+		setInterval(function(){
+			self.cache_cleaner();
+		}, self.opts.check).unref();
+	}
 
 	return this;
 };
