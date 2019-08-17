@@ -1,5 +1,6 @@
 process.env.NODE_ENV = "test";
 const lrufiles = require("../src/index");
+const fs = require("fs");
 
 const cache = new lrufiles({
   dir: "cache", 			// directory to store caches files
@@ -11,6 +12,16 @@ const cache = new lrufiles({
 describe("store / get / delete string in cache", () => {
   test('store string to cache', async () => {
     let resp = await cache.set("key", "sample_value_2");
+    expect(resp.endsWith("key")).toBe(true);
+  });
+
+  test('store object to cache', async () => {
+    let resp = await cache.set("key", {"success": true});
+    expect(resp.endsWith("key")).toBe(true);
+  });
+
+  test('store stream to cache', async () => {
+    let resp = await cache.set("key", fs.createReadStream("./LICENSE"));
     expect(resp.endsWith("key")).toBe(true);
   });
 
@@ -77,6 +88,14 @@ describe("set two buffers and clear entire cache", () => {
 
 
 describe("non-existent cache operations", () => {
+  test('setting / as cache key to check errror', async () => {
+    try{
+      await cache.set("/", "something");
+    } catch(err) {
+      expect(err.message).toBe("'/' is not supported character as key.");
+    }
+  });
+
   test('trying to get non-existent cache key', async () => {
     let resp = await cache.get("does_not_exist");
     expect(resp).toBe(undefined);
