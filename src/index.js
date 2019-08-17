@@ -67,12 +67,15 @@ class FileCache {
 	}
 
 	async has(file, resolved_path) {
+		let resolved_file;
 		if(!resolved_path){
-			file = path.resolve(this.opts.dir, utils.sanitize(file));
+			resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
+		} else {
+			resolved_file = file;
 		}
 
 		try {
-			await fsPromises.access(file);
+			await fsPromises.access(resolved_file);
 			return true
 		} catch (e) {
 			return false;
@@ -84,13 +87,13 @@ class FileCache {
 			throw new Error("'/' is not supported character as key.");
 		}
 
-		file = path.resolve(this.opts.dir, utils.sanitize(file));
+		let resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
 
 		if ((data instanceof stream) || (data instanceof stream.Readable) || (data.readable === true)) {
 			// pipe stream to file
 			return new Promise((resolve, reject) => {
-				data.pipe(fs.createWriteStream(file).on("finish", function(){
-					resolve(file);
+				data.pipe(fs.createWriteStream(resolved_file).on("finish", function(){
+					resolve(resolved_file);
 				}).on("error", function(err){
 					reject(err);
 				}));
@@ -98,21 +101,21 @@ class FileCache {
 
 		}else if (data instanceof Buffer) {
 			// write buffer to file
-			await fsPromises.writeFile(file, data);
+			await fsPromises.writeFile(resolved_file, data);
 		} else if (typeof data === "object") {
-			await fsPromises.writeFile(file, JSON.stringify(data));
+			await fsPromises.writeFile(resolved_file, JSON.stringify(data));
 		} else {
 			// write to file
-			await fsPromises.writeFile(file, data);
+			await fsPromises.writeFile(resolved_file, data);
 		}
-		return file;
+		return resolved_file;
 	}
 
 	async delete(file) {
-		file = path.resolve(this.opts.dir, utils.sanitize(file));
+		let resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
 
-		if(await this.has(file, true)){
-			await fsPromises.unlink(file);
+		if(await this.has(resolved_file, true)){
+			await fsPromises.unlink(resolved_file);
 			return true;
 		} else {
 			return false;
@@ -124,26 +127,26 @@ class FileCache {
 			time = Date.now();
 		}
 
-		file = path.resolve(this.opts.dir, utils.sanitize(file));
-		await fsPromises.utimes(file, time, time);
+		let resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
+		await fsPromises.utimes(resolved_file, time, time);
 		return true;
 	}
 
 	async get(file) {
-		file = path.resolve(this.opts.dir, utils.sanitize(file));
+		let resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
 
-		if(await this.has(file, true)){
-			return fsPromises.readFile(file);
+		if(await this.has(resolved_file, true)){
+			return fsPromises.readFile(resolved_file);
 		} else {
 			return undefined;
 		}
 	}
 
 	async stream(file) {
-		file = path.resolve(this.opts.dir, utils.sanitize(file));
+		let resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
 
-		if(await this.has(file, true)){
-			return fs.createReadStream(file);
+		if(await this.has(resolved_file, true)){
+			return fs.createReadStream(resolved_file);
 		} else {
 			return undefined;
 		}
