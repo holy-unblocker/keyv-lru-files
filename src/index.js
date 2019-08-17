@@ -142,11 +142,11 @@ class FileCache {
 		}
 	}
 
-	async stream(file) {
+	async stream(file, opts) {
 		let resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
 
 		if(await this.has(resolved_file, true)){
-			return fs.createReadStream(resolved_file);
+			return fs.createReadStream(resolved_file, opts);
 		} else {
 			return undefined;
 		}
