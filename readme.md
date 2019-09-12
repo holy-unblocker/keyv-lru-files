@@ -1,6 +1,6 @@
 # Keyv lru files
 
-[![Build Status](https://travis-ci.org/gumlet/keyv-lru-files.svg?branch=master)](https://travis-ci.org/gumlet/keyv-lru-files)
+[![Build Status](https://github.com/gumlet/keyv-lru-files/workflows/Node%20CI/badge.svg)](https://github.com/gumlet/keyv-lru-files/actions)
 
 A file cache inspired by [lru-cache](https://github.com/isaacs/node-lru-cache).
 Least recently used files are deleted. It's helpful if your filesystem uses `atime`.
