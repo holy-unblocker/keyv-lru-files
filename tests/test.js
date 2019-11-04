@@ -2,14 +2,17 @@ process.env.NODE_ENV = "test";
 const lrufiles = require("../src/index");
 const fs = require("fs");
 
-const cache = new lrufiles({
-  dir: "cache", 			// directory to store caches files
-	files: 3,       // maximum number of files
-	size: "1 GB",     // maximum total file size
-	check: 10,  // interval of stale checks in minutes
-});
+
 
 describe("store / get / delete string in cache", () => {
+  const cache = new lrufiles({
+    level: 1,
+    dir: "cache", 			// directory to store caches files
+  	files: 3,       // maximum number of files
+  	size: "1 GB",     // maximum total file size
+  	check: 10,  // interval of stale checks in minutes
+  });
+
   test('store string to cache', async () => {
     let resp = await cache.set("key", "sample_value_2");
     expect(resp.endsWith("key")).toBe(true);
@@ -59,6 +62,14 @@ describe("store / get / delete string in cache", () => {
 });
 
 describe("set two buffers and clear entire cache", () => {
+  const cache = new lrufiles({
+    level: 1,
+    dir: "cache", 			// directory to store caches files
+  	files: 3,       // maximum number of files
+  	size: "1 GB",     // maximum total file size
+  	check: 10,  // interval of stale checks in minutes
+  });
+
   test('store first buffer to cache', async () => {
     let resp = await cache.set("buf1", Buffer.from("sample_1"));
     expect(resp.endsWith("buf1")).toBe(true);
@@ -88,6 +99,14 @@ describe("set two buffers and clear entire cache", () => {
 
 
 describe("non-existent cache operations", () => {
+  const cache = new lrufiles({
+    level: 1,
+    dir: "cache", 			// directory to store caches files
+  	files: 3,       // maximum number of files
+  	size: "1 GB",     // maximum total file size
+  	check: 10,  // interval of stale checks in minutes
+  });
+
   test('setting / as cache key to check errror', async () => {
     try{
       await cache.set("/", "something");
