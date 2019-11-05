@@ -69,7 +69,7 @@ class FileCache {
 				let files = await fsPromises.readdir(this.opts.dir);
 				return files;
 			} else if(this.opts.level == 2) {
-
+				let files = [];
 				let list = await fsPromises.readdir(this.opts.dir);
 				for (let file of list) {
 					file = path.resolve(this.opts.dir, file);
@@ -158,6 +158,7 @@ class FileCache {
 		}
 
 		if(await this.has(resolved_file, true)){
+			console.log(resolved_file)
 			await fsPromises.unlink(resolved_file);
 			return true;
 		} else {
@@ -236,13 +237,12 @@ class FileCache {
 
 		let remove = [];
 		let size = 0;
-
 		for (let i in files) {
 			let stats;
 			if(this.opts.level == 1) {
 				stats = await fsPromises.stat(path.resolve(this.opts.dir, files[i]));
 			} else {
-				stats = await fsPromises.stat(path.resolve(this.opts.dir, files[i].silce(-2), files[i]));
+				stats = await fsPromises.stat(path.resolve(this.opts.dir, files[i].slice(-2), files[i]));
 			}
 
 			files[i] = {
@@ -267,14 +267,14 @@ class FileCache {
 		};
 
 		remove = remove.concat(files);
-
+		// console.log(remove);
 
 		// check if there are removable files
 		if (remove.length === 0) return;
 
 		let promises = [];
 		for(const file of remove){
-			promises.push(this.delete(file.name));
+			await this.delete(file.name);
 		}
 		await Promise.all(promises);
 		return true;

@@ -3,3 +3,5 @@ node_modules
 coverage
 bigcache
 cleaner_test
+tests/bigcache_l2
+tests/cleaner_test_l2
