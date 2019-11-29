@@ -272,7 +272,7 @@ class FileCache {
 
 		let promises = [];
 		for(const file of remove){
-			await this.delete(file.name);
+			promises.push(this.delete(file.name));
 		}
 		await Promise.all(promises);
 		return true;
