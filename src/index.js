@@ -158,7 +158,6 @@ class FileCache {
 		}
 
 		if(await this.has(resolved_file, true)){
-			console.log(resolved_file)
 			await fsPromises.unlink(resolved_file);
 			return true;
 		} else {
@@ -236,7 +235,6 @@ class FileCache {
 		let files = await this.keys();
 
 		let remove = [];
-		let size = 0;
 		for (let i in files) {
 			let stats;
 			if(this.opts.level == 1) {
@@ -262,12 +260,12 @@ class FileCache {
 		};
 
 		// check for filesize violations
-		if (this.opts.size) while (this.opts.size > size && files.length) {
+		let size = (files.length > 0) ? files[files.length - 1].size : 0;
+		if (this.opts.size) while (this.opts.size >= size && files.length) {
 			size += files.pop().size;
 		};
 
 		remove = remove.concat(files);
-		// console.log(remove);
 
 		// check if there are removable files
 		if (remove.length === 0) return;

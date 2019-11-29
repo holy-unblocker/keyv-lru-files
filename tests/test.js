@@ -350,7 +350,7 @@ describe("testing cron job", () => {
   const bigcache = new lrufiles({
     dir: "cleaner_test", 			// directory to store caches files
   	files: null,       // maximum number of files
-  	size: 1,     // maximum total file size
+  	size: 6,     // maximum total file size
   	check: 0.1,  // interval of stale checks in minutes
   });
 
@@ -380,12 +380,12 @@ describe("testing cron job in LEVEL 2 cache", () => {
     level: 2,
     dir: "cleaner_test_l2", 			// directory to store caches files
   	files: null,       // maximum number of files
-  	size: 1,     // maximum total file size
+  	size: 6,     // maximum total file size
   	check: 0.1,  // interval of stale checks in minutes
   });
 
   let delayPromise = new Promise((resolve) => {
-    setTimeout(resolve, 8000);
+    setTimeout(resolve, 16000);
   });
 
   test('write 5 files', async () => {
@@ -400,7 +400,6 @@ describe("testing cron job in LEVEL 2 cache", () => {
   test('after 8 seconds, files should be 1', async () => {
     await delayPromise;
     let keys = await bigcache.keys();
-    console.log(keys);
     expect(keys.length).toBe(1);
   });
 
