@@ -19,6 +19,7 @@ npm install keyv-lru-files
 var lrufiles = require("keyv-lru-files");
 
 var cache = new lrufiles({
+	level: 1  				// Level 1 stores files in flat directory. level 2 stores in 2 level directory structure.
 	dir: "cache" 			// directory to store caches files
 	files: 100,       // maximum number of files
 	size: "1 GB",     // maximum total file size
