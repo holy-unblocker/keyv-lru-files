@@ -111,21 +111,7 @@ class FileCache {
 			throw new Error("'/' is not supported character as key.");
 		}
 
-		let resolved_file;
-
-		if(this.opts.level == 1) {
-			resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
-		} else {
-			try {
-				let stats = await fsPromises.stat(path.resolve(this.opts.dir, file.slice(-2)));
-				if(!stats.isDirectory()){
-					await fsPromises.mkdir(path.resolve(this.opts.dir, file.slice(-2)));
-				}
-			} catch (e) {
-				await fsPromises.mkdir(path.resolve(this.opts.dir, file.slice(-2)));
-			}
-			resolved_file = path.resolve(this.opts.dir, file.slice(-2), utils.sanitize(file));
-		}
+		let resolved_file = await this.get_resolved_file(file);
 
 		if ((data instanceof stream) || (data instanceof stream.Readable) || (data.readable === true)) {
 			// pipe stream to file
@@ -145,6 +131,29 @@ class FileCache {
 		} else {
 			// write to file
 			await fsPromises.writeFile(resolved_file, data);
+		}
+		return resolved_file;
+	}
+
+	async get_resolved_file(file) {
+		if(file.indexOf("/") >= 0){
+			throw new Error("'/' is not supported character as key.");
+		}
+
+		let resolved_file;
+
+		if(this.opts.level == 1) {
+			resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
+		} else {
+			try {
+				let stats = await fsPromises.stat(path.resolve(this.opts.dir, file.slice(-2)));
+				if(!stats.isDirectory()){
+					await fsPromises.mkdir(path.resolve(this.opts.dir, file.slice(-2)));
+				}
+			} catch (e) {
+				await fsPromises.mkdir(path.resolve(this.opts.dir, file.slice(-2)));
+			}
+			resolved_file = path.resolve(this.opts.dir, file.slice(-2), utils.sanitize(file));
 		}
 		return resolved_file;
 	}
@@ -170,20 +179,7 @@ class FileCache {
 			time = Date.now();
 		}
 
-		let resolved_file;
-		if(this.opts.level == 1) {
-			resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
-		} else {
-			try {
-				let stats = await fsPromises.stat(path.resolve(this.opts.dir, file.slice(-2)));
-				if(!stats.isDirectory()){
-					await fsPromises.mkdir(path.resolve(this.opts.dir, file.slice(-2)));
-				}
-			} catch (e) {
-				await fsPromises.mkdir(path.resolve(this.opts.dir, file.slice(-2)));
-			}
-			resolved_file = path.resolve(this.opts.dir, file.slice(-2), utils.sanitize(file));
-		}
+		let resolved_file = await this.get_resolved_file(file);
 		await fsPromises.utimes(resolved_file, time, time);
 		return true;
 	}
