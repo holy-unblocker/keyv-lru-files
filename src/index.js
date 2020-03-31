@@ -230,7 +230,7 @@ class FileCache {
 	}
 
 	async cache_cleaner() {
-		await exec(`cd ${this.opts.dir} && ls -ltu | tail -n+${this.opts.files} | awk '{t+=$5} t > ${this.opts.size}'| awk '{print &9}' | xargs -d '\n' -r rm --`)
+		await exec(`cd ${this.opts.dir} && ls -ltu | tail -n+${this.opts.files} | awk '{t+=$5} t > ${this.opts.size}'| awk '{print $9}' | xargs -d '\n' -r rm --`)
 		// let files = await this.keys();
 		//
 		// let remove = [];
