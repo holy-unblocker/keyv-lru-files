@@ -189,7 +189,14 @@ class FileCache {
 	}
 
 	async cache_cleaner() {
-		await exec(`cd ${this.opts.dir} && ls -ltu | tail -n+${this.opts.files} | awk '{t+=$5} t > ${this.opts.size}'| awk '{print $9}' | xargs -d '\n' -r rm --`)
+
+		// remove files which exceed the specified GBs
+		if(this.opts.size) await exec(`cd ${this.opts.dir} && ls -ltu | awk '{t+=$5} t > ${this.opts.size}'| awk '{print $9}' | xargs -d '\n' -r rm --`);
+
+		// remove files which exceed the given count
+		if(this.opts.files) await exec(`cd ${this.opts.dir} && ls -1u | tail -n+${this.opts.files} | xargs -d '\n' -r rm --`)
+
+
 		// let files = await this.keys();
 		//
 		// let remove = [];
