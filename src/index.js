@@ -56,33 +56,14 @@ class FileCache {
 			o.check = opts.check * 60 * 1000 // convert passed minutes to milliseconds...
 		}
 
-		if(!opts.level || opts.level == 1) {
-			o.level = 1;
-		} else {
-			o.level = 2;
-		}
-
 		return o;
 	}
 
 	async keys() {
 		try {
-			if(this.opts.level == 1) {
 				let files = await fsPromises.readdir(this.opts.dir);
 				return files;
-			} else if(this.opts.level == 2) {
-				let files = [];
-				let list = await fsPromises.readdir(this.opts.dir);
-				for (let file of list) {
-					file = path.resolve(this.opts.dir, file);
-					let stat = await fsPromises.stat(file);
-					if(stat && stat.isDirectory()){
-						let results = await fsPromises.readdir(file);
-						files = files.concat(results);
-					}
-				}
-				return files;
-			}
+
 		} catch (e) {
 			return [];
 		}
@@ -91,11 +72,8 @@ class FileCache {
 	async has(file, resolved_path) {
 		let resolved_file;
 		if(!resolved_path){
-			if(this.opts.level == 1){
 				resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
-			} else {
-				resolved_file = path.resolve(this.opts.dir, file.slice(-2), utils.sanitize(file));
-			}
+
 		} else {
 			resolved_file = file;
 		}
@@ -143,30 +121,16 @@ class FileCache {
 		}
 
 		let resolved_file;
-
-		if(this.opts.level == 1) {
 			resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
-		} else {
-			try {
-				let stats = await fsPromises.stat(path.resolve(this.opts.dir, file.slice(-2)));
-				if(!stats.isDirectory()){
-					await fsPromises.mkdir(path.resolve(this.opts.dir, file.slice(-2)));
-				}
-			} catch (e) {
-				await fsPromises.mkdir(path.resolve(this.opts.dir, file.slice(-2)));
-			}
-			resolved_file = path.resolve(this.opts.dir, file.slice(-2), utils.sanitize(file));
-		}
+
 		return resolved_file;
 	}
 
 	async delete(file) {
 		let resolved_file;
-		if(this.opts.level == 1) {
+
 			resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
-		} else {
-			resolved_file = path.resolve(this.opts.dir, file.slice(-2), utils.sanitize(file));
-		}
+
 
 		if(await this.has(resolved_file, true)){
 			await fsPromises.unlink(resolved_file);
@@ -188,11 +152,9 @@ class FileCache {
 
 	async get(file) {
 		let resolved_file;
-		if(this.opts.level == 1) {
+
 			resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
-		} else {
-			resolved_file = path.resolve(this.opts.dir, file.slice(-2), utils.sanitize(file));
-		}
+
 
 		if(await this.has(resolved_file, true)){
 			return fsPromises.readFile(resolved_file);
@@ -203,11 +165,8 @@ class FileCache {
 
 	async stream(file, opts) {
 		let resolved_file;
-		if(this.opts.level == 1) {
 			resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
-		} else {
-			resolved_file = path.resolve(this.opts.dir, file.slice(-2), utils.sanitize(file));
-		}
+
 
 		if(await this.has(resolved_file, true)){
 			return fs.createReadStream(resolved_file, opts);
