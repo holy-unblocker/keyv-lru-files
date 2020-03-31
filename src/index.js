@@ -194,7 +194,7 @@ class FileCache {
 		if(this.opts.size) await exec(`cd ${this.opts.dir} && ls -ltu | awk '{t+=$5} t > ${this.opts.size}'| awk '{print $9}' | xargs -d '\n' -r rm --`);
 
 		// remove files which exceed the given count
-		if(this.opts.files) await exec(`cd ${this.opts.dir} && ls -1u | tail -n+${this.opts.files} | xargs -d '\n' -r rm --`);
+		if(this.opts.files) await exec(`cd ${this.opts.dir} && ls -1u | tail -n+${this.opts.files + 1} | xargs -d '\n' -r rm --`);
 	}
 }
 
