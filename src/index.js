@@ -6,6 +6,8 @@ var fsPromises = fs.promises;
 var path = require("path");
 var stream = require("stream");
 var utils = require("./utils");
+const util = require('util');
+const exec = util.promisify(require('child_process').exec);
 
 // require npm modules
 var rimraf = require("rimraf");
@@ -228,50 +230,51 @@ class FileCache {
 	}
 
 	async cache_cleaner() {
-		let files = await this.keys();
-
-		let remove = [];
-		for (let i in files) {
-			let stats;
-			if(this.opts.level == 1) {
-				stats = await fsPromises.stat(path.resolve(this.opts.dir, files[i]));
-			} else {
-				stats = await fsPromises.stat(path.resolve(this.opts.dir, files[i].slice(-2), files[i]));
-			}
-
-			files[i] = {
-	      name: files[i],
-	      atime: stats.atime.getTime(),
-				size: stats.size
-	    }
-		}
-
-		files = files.sort(function (a, b) {
-	    return a.atime - b.atime;
-		});
-
-		// check for filecount violation
-		if (this.opts.files) while (files.length > this.opts.files) {
-			remove.push(files.shift());
-		};
-
-		// check for filesize violations
-		let size = (files.length > 0) ? files[files.length - 1].size : 0;
-		if (this.opts.size) while (this.opts.size >= size && files.length) {
-			size += files.pop().size;
-		};
-
-		remove = remove.concat(files);
-
-		// check if there are removable files
-		if (remove.length === 0) return;
-
-		let promises = [];
-		for(const file of remove){
-			promises.push(this.delete(file.name));
-		}
-		await Promise.all(promises);
-		return true;
+		await exec(`cd ${this.opts.dir} && ls -ltu | tail -n+${this.opts.files} | awk '{t+=$5} t > ${this.opts.size}' | xargs -d '\n' -r rm --`)
+		// let files = await this.keys();
+		//
+		// let remove = [];
+		// for (let i in files) {
+		// 	let stats;
+		// 	if(this.opts.level == 1) {
+		// 		stats = await fsPromises.stat(path.resolve(this.opts.dir, files[i]));
+		// 	} else {
+		// 		stats = await fsPromises.stat(path.resolve(this.opts.dir, files[i].slice(-2), files[i]));
+		// 	}
+		//
+		// 	files[i] = {
+	  //     name: files[i],
+	  //     atime: stats.atime.getTime(),
+		// 		size: stats.size
+	  //   }
+		// }
+		//
+		// files = files.sort(function (a, b) {
+	  //   return a.atime - b.atime;
+		// });
+		//
+		// // check for filecount violation
+		// if (this.opts.files) while (files.length > this.opts.files) {
+		// 	remove.push(files.shift());
+		// };
+		//
+		// // check for filesize violations
+		// let size = (files.length > 0) ? files[files.length - 1].size : 0;
+		// if (this.opts.size) while (this.opts.size >= size && files.length) {
+		// 	size += files.pop().size;
+		// };
+		//
+		// remove = remove.concat(files);
+		//
+		// // check if there are removable files
+		// if (remove.length === 0) return;
+		//
+		// let promises = [];
+		// for(const file of remove){
+		// 	promises.push(this.delete(file.name));
+		// }
+		// await Promise.all(promises);
+		// return true;
 	}
 }
 
