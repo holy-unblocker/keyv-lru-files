@@ -150,7 +150,7 @@ describe("write many files and check stale cache cleaner", () => {
   const bigcache = new lrufiles({
     dir: "bigcache", // directory to store caches files
     files: 3, // maximum number of files
-    size: 12, // maximum total file size
+    size: 120, // maximum total file size
     check: 10, // interval of stale checks in minutes
   });
 
@@ -164,12 +164,12 @@ describe("write many files and check stale cache cleaner", () => {
     expect(keys.length).toBe(5);
   });
 
-  test('after cache cleaner run, filecount should be 2', async () => {
+  test('after cache cleaner run, filecount should be 3', async () => {
     // out of 5 keys, it first removes 2 least recently used.
     // then it removes least recently used file exceeding the storage size.
     await bigcache.cache_cleaner();
     let keys = await bigcache.keys();
-    expect(keys.length).toBe(2);
+    expect(keys.length).toBe(3);
   });
 
 });
