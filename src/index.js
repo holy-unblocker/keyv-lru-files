@@ -190,6 +190,7 @@ class FileCache {
 
 	async cache_cleaner() {
 		try {
+			console.log("Clearing LRU Caches.")
 			// remove files which exceed the specified GBs
 			if(this.opts.size) await exec(`cd ${this.opts.dir} && ls -ltu | awk '{t+=$5} t > ${this.opts.size}'| awk '{print $9}' | xargs -d '\n' -r rm --`);
 
