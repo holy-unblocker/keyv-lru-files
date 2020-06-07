@@ -2,14 +2,11 @@ process.env.NODE_ENV = "test";
 const lrufiles = require("../src/index");
 const fs = require("fs");
 
-
-
 describe("store / get / delete string in cache", () => {
   const cache = new lrufiles({
     dir: "cache", // directory to store caches files
     files: 3, // maximum number of files
     size: "1 GB", // maximum total file size
-    check: 10, // interval of stale checks in minutes
   });
 
   test('store string to cache', async () => {
@@ -70,7 +67,6 @@ describe("set two buffers and clear entire cache", () => {
     dir: "cache", // directory to store caches files
     files: 3, // maximum number of files
     size: "1 GB", // maximum total file size
-    check: 10, // interval of stale checks in minutes
   });
 
   test('store first buffer to cache', async () => {
@@ -86,18 +82,10 @@ describe("set two buffers and clear entire cache", () => {
   test('clear entire cache', async () => {
     let resp = await cache.clear();
     expect(true).toBe(true);
-  });
 
-  test('clear entire cache when it does not exist', async () => {
-    let resp = await cache.clear();
-    expect(true).toBe(true);
+    let keys = await cache.keys();
+    expect(keys.length).toBe(0);
   });
-
-  test('check if list of keys is zero', async () => {
-    let resp = await cache.keys();
-    expect(resp.length).toBe(0);
-  });
-
 });
 
 
@@ -106,15 +94,10 @@ describe("non-existent cache operations", () => {
     dir: "cache", // directory to store caches files
     files: 3, // maximum number of files
     size: "1 GB", // maximum total file size
-    check: 10, // interval of stale checks in minutes
   });
 
   test('setting / as cache key to check errror', async () => {
-    try {
-      await cache.set("/", "something");
-    } catch (err) {
-      expect(err.message).toBe("'/' is not supported character as key.");
-    }
+    await expect(cache.set("/", "something")).rejects.toThrow("'/' is not supported character as key.")
   });
 
   test('trying to get non-existent cache key', async () => {
@@ -138,20 +121,15 @@ describe("non-existent cache operations", () => {
   });
 
   test('touching non-existent key', async () => {
-    try {
-      await cache.touch("does_not_exist")
-    } catch (err) {
-      expect(err.code).toBe('ENOENT');
-    }
+    await expect(cache.touch("dows_not_exist")).rejects.toThrow('KEY_NOT_FOUND');
   });
 });
 
-describe("write many files and check stale cache cleaner", () => {
+describe("write many files and check stale cache cleaner for number of files", () => {
   const bigcache = new lrufiles({
     dir: "bigcache", // directory to store caches files
     files: 3, // maximum number of files
     size: 120, // maximum total file size
-    check: 10, // interval of stale checks in minutes
   });
 
   test('write 5 files', async () => {
@@ -161,29 +139,16 @@ describe("write many files and check stale cache cleaner", () => {
     await bigcache.set("file4", "value4");
     await bigcache.set("file5", "value5");
     let keys = await bigcache.keys();
-    expect(keys.length).toBe(5);
-  });
-
-  test('after cache cleaner run, filecount should be 3', async () => {
-    // out of 5 keys, it first removes 2 least recently used.
-    // then it removes least recently used file exceeding the storage size.
-    await bigcache.cache_cleaner();
-    let keys = await bigcache.keys();
     expect(keys.length).toBe(3);
   });
 
 });
 
-describe("testing cron job", () => {
+describe("write many files and check stale cache cleaner for number of bytes", () => {
   const bigcache = new lrufiles({
-    dir: "cleaner_test", // directory to store caches files
+    dir: "byte_cache", // directory to store caches files
     files: null, // maximum number of files
     size: 6, // maximum total file size
-    check: 0.1, // interval of stale checks in minutes
-  });
-
-  let delayPromise = new Promise((resolve) => {
-    setTimeout(resolve, 8000);
   });
 
   test('write 5 files', async () => {
@@ -191,12 +156,7 @@ describe("testing cron job", () => {
     await bigcache.set("file2", "value2");
     await bigcache.set("file3", "value3");
     await bigcache.set("file4", "value4");
-    let resp = await bigcache.set("file5", "value5");
-    expect(resp.endsWith("file5")).toBe(true);
-  });
-
-  test('after 8 seconds, files should be 1', async () => {
-    await delayPromise;
+    await bigcache.set("file5", "value5");
     let keys = await bigcache.keys();
     expect(keys.length).toBe(1);
   });

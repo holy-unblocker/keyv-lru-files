@@ -18,7 +18,9 @@
     "filesystem"
   ],
   "dependencies": {
-    "rimraf": "^3.0.0"
+    "rimraf": "^3.0.0",
+    "sqlite": "^4.0.10",
+    "sqlite3": "^4.2.0"
   },
   "devDependencies": {
     "coveralls": "^3.0.2",
