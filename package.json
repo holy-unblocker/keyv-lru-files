@@ -1,6 +1,6 @@
 {
   "name": "keyv-lru-files",
-  "version": "1.2.5",
+  "version": "1.3.0",
   "description": "Nodejs key-value LRU cache which uses filesystem as storage ",
   "license": "MIT",
   "author": "Aditya Patadia",

@@ -148,7 +148,7 @@ describe("write many files and check stale cache cleaner for number of bytes", (
   const bigcache = new lrufiles({
     dir: "byte_cache", // directory to store caches files
     files: null, // maximum number of files
-    size: 6, // maximum total file size
+    size: 12, // maximum total file size
   });
 
   test('write 5 files', async () => {
@@ -158,7 +158,7 @@ describe("write many files and check stale cache cleaner for number of bytes", (
     await bigcache.set("file4", "value4");
     await bigcache.set("file5", "value5");
     let keys = await bigcache.keys();
-    expect(keys.length).toBe(1);
+    expect(keys.length).toBe(2);
   });
 
 });

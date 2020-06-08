@@ -8,8 +8,8 @@ const fsPromises = fs.promises,
   path = require("path"),
   stream = require("stream"),
   utils = require("./utils"),
-	util = require('util'),
-	rimraf = require("rimraf");
+  util = require('util'),
+  rimraf = require("rimraf");
 
 class FileCache {
   constructor(opts) {
@@ -118,10 +118,7 @@ class FileCache {
       throw new Error("'/' is not supported character as key.");
     }
 
-    let resolved_file;
-    resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
-
-    return resolved_file;
+    return path.resolve(this.opts.dir, utils.sanitize(file));
   }
 
   async delete(file) {
