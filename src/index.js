@@ -147,6 +147,7 @@ class FileCache {
     await this.open_sqlite();
     let resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
     if (await this.has(file)) {
+      await this.touch(file);
       return fsPromises.readFile(resolved_file);
     } else {
       return undefined;
@@ -157,6 +158,7 @@ class FileCache {
     let resolved_file = path.resolve(this.opts.dir, utils.sanitize(file));
 
     if (await this.has(file)) {
+      await this.touch(file);
       return fs.createReadStream(resolved_file, opts);
     } else {
       return undefined;
