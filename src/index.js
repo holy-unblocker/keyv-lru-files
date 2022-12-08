@@ -27,7 +27,7 @@ class FileCache {
 
     // determine cache directory
     if (!opts.hasOwnProperty("dir") || typeof opts.dir !== "string") opts.dir = "cache";
-    o.dir = path.resolve(require.main.filename, "..", opts.dir);
+    o.dir = path.resolve(process.cwd(), opts.dir);
 
     // determine maximal total number of files
     opts.files = (!opts.hasOwnProperty("files")) ? false : parseInt(opts.files, 10);
